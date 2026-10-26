@@ -32,12 +32,36 @@ OPENROUTER_PRICING: dict[str, tuple[float, float]] = {
     "google/gemini-2.5-flash": (0.30, 2.50),
 }
 
-ASSUMED_OUTPUT_TOKENS_PER_STEP = 80  # for pre-run estimates; max_tokens is 200
+# Pre-run estimates count prompt tokens with tiktoken's o200k encoding. Measured on
+# 2026-10-26: OpenAI models bill about 1.0x that count and write about 55 output
+# tokens a step; Anthropic models bill about 1.7x and write about 145 (longer reasons).
+PROVIDER_FACTORS: dict[str, tuple[float, int]] = {  # (input multiplier, output tokens per step)
+    "openai": (1.0, 60),
+    "anthropic": (1.75, 150),
+    "google": (1.2, 100),  # not yet measured; a guess with headroom
+}
 
 
 def estimate_cost_usd(model: str, input_tokens: int, steps: int) -> float:
     pin, pout = OPENROUTER_PRICING[model]
-    return input_tokens / 1e6 * pin + steps * ASSUMED_OUTPUT_TOKENS_PER_STEP / 1e6 * pout
+    mult, out_per_step = PROVIDER_FACTORS.get(model.split("/")[0], (1.5, 120))
+    return input_tokens * mult / 1e6 * pin + steps * out_per_step / 1e6 * pout
+
+
+def as_confidence(value) -> float:
+    """Coerce a judge's confidence to a float; words map to rough numbers, junk to 0."""
+    if isinstance(value, bool):
+        return 1.0 if value else 0.0
+    if isinstance(value, (int, float)):
+        return max(0.0, min(1.0, float(value)))
+    if isinstance(value, str):
+        text = value.strip().lower().rstrip("%")
+        try:
+            number = float(text)
+            return max(0.0, min(1.0, number / 100 if number > 1 else number))
+        except ValueError:
+            return {"very high": 0.95, "high": 0.9, "medium": 0.6, "moderate": 0.6, "low": 0.3, "very low": 0.1}.get(text, 0.0)
+    return 0.0
 
 
 class OpenRouterJudge(LLMJudge):
@@ -84,6 +108,10 @@ class OpenRouterJudge(LLMJudge):
 
         if self.total_cost >= self.budget_usd:
             self.budget_exceeded = True
+            self._log({"trajectory_id": trajectory_context.get("trajectory_id"), "trajectory_type": trajectory_context.get("trajectory_type"),
+                       "category": trajectory_context.get("category"), "rogue_step": trajectory_context.get("rogue_step"), "step": step_index,
+                       "model": self.model, "prompt_version": self.prompt_version, "is_rogue": False, "confidence": 0.0,
+                       "judge_category": None, "reason": "budget stop", "input_tokens": 0, "output_tokens": 0, "error": None})
             return StepResult(step_index=step_index, is_rogue=False, confidence=0.0, reason="budget stop")
 
         task = trajectory_context.get("task", {})
@@ -153,7 +181,7 @@ class OpenRouterJudge(LLMJudge):
                 "model": self.model,
                 "prompt_version": self.prompt_version,
                 "is_rogue": bool(parsed.get("is_rogue", False)),
-                "confidence": float(parsed.get("confidence", 0.0) or 0.0),
+                "confidence": as_confidence(parsed.get("confidence")),
                 "judge_category": parsed.get("category"),
                 "reason": parsed.get("reason"),
                 "input_tokens": usage_in,
@@ -164,7 +192,7 @@ class OpenRouterJudge(LLMJudge):
         return StepResult(
             step_index=step_index,
             is_rogue=bool(parsed.get("is_rogue", False)),
-            confidence=float(parsed.get("confidence", 0.0) or 0.0),
+            confidence=as_confidence(parsed.get("confidence")),
             category=parsed.get("category"),
             reason=parsed.get("reason"),
         )
