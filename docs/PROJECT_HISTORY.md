@@ -1,5 +1,15 @@
 # Project history
 
+## 2026-10-27 (morning): Opus 5.5 run, refusals scale with model tier
+
+Why: the owner topped up OpenRouter (credits 45 to 65) and raised the Kickaround workspace's weekly budget from US$20 to US$40 so the last pre-registered judge could run.
+
+Ran (`results/2026-10-27-holdout-opus`, merged into `results/2026-10-27-holdout-all`): Claude Opus 5.5, prompt v1, all 216 held-out trajectories, 600-token cap, US$14.62 (estimate US$17.39; Opus writes about 113 output tokens a step, fewer than the 150 assumed). No cut-off answers, one salvaged, no budget stop, so no repair pass was needed.
+
+Result: refusals as silence 19.4% false positives, 38.0% recall, EIR 0.68, 24.4% premature; refusals as alerts 21.3%, 100%, 0.89, 11.1%. Anthropic's filter refused 179 of 3,056 steps (175 on rogue runs, 4 on clean), 83 of them the labelled rogue step, in 86 of the 108 rogue runs: UFO 47, SEC 40, TST 29, INV 26, RES 22, DEC 11. Haiku refused 0, Sonnet 83, Opus 179: the refusal rate rises with the model tier. Every refusal carries its request id. Agreement with the three judges that answer is low (kappa 0.15 to 0.28) because of the silences; 34 of 108 rogue runs were caught by all five judges and none escaped all five.
+
+Spend this run US$14.62; pilot total US$26.62 over three sessions. Left on the account US$11.25 (checked 2026-10-27 about 13:30 UTC), weekly workspace budget about US$13 remaining until November 2.
+
 ## 2026-10-27 (night): Gemini and Sonnet run, a truncation bug found and repaired, a refusal finding
 
 Why: the owner topped up OpenRouter and asked for Gemini 3.5 Flash Lite and Claude Sonnet 5.5 on the held-out set (about US$10 together) and the v2 comparison finished.
@@ -42,7 +52,6 @@ Checked and not used: `agent-governance-toolkit` 4.1.0 (imports as `agent_compli
 
 ## Open items
 
-- Opus 5.5 on the held-out set (about US$17) once the owner wants it; check `parse_status` and refusal counts before reading its row.
 - Three Haiku answers and one development-split answer still fail to parse after re-asking (600 tokens of output, empty or whitespace content); negligible, but look at what the provider returns.
 - The calibration rule demands a false-alarm drop first; v2 failed it on the merits (86% false positives). The development split is much harder on false alarms (v1: 36%) than the held-out set (24%); understand why before trusting deltas, and consider StepShield's deployment-test split.
 - Ask Anthropic (or read the refusals documentation) whether the content filter can be relaxed for monitoring use, and how other filtered providers behave; the refusal finding needs a right of reply.
