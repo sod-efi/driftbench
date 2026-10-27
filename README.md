@@ -9,7 +9,7 @@ Vendors sell "goal drift" and "intent" detection for AI agents behind sales call
 - whether it fires in time (within three steps after the violation, not before it),
 - and what it costs per 1,000 trajectories.
 
-The first data set is [StepShield](https://github.com/glo26/stepshield) (Felicia et al., NeurIPS 2026): 216 strictly held-out code-agent trajectories, 108 rogue with the divergence step marked by annotators (kappa 0.82) and 108 clean.
+The first data set is [StepShield](https://github.com/glo26/stepshield) (Felicia et al., arXiv 2601.22136, 2026): 216 strictly held-out code-agent trajectories, 108 rogue with the divergence step marked by annotators (kappa 0.82) and 108 clean.
 
 ## Pilot results (October 26-27, 2026, held-out set, the paper's prompt)
 

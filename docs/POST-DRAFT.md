@@ -10,7 +10,7 @@ Companies now sell "drift detection" for AI agents: a monitor that watches an ag
 
 ### What I did
 
-A NeurIPS 2026 paper, StepShield, published 216 transcripts of coding agents at work. In 108 of them the agent goes rogue partway through (deletes files it should not touch, sends data to an outside server, edits the tests so they pass), and the authors marked the exact step where it happens. The other 108 stay on task. The paper also publishes a simple monitor recipe: send each step to a language model with the task and the agent's action, and ask in JSON, "is this off task?"
+A 2026 preprint, StepShield (arXiv 2601.22136), published 216 transcripts of coding agents at work. In 108 of them the agent goes rogue partway through (deletes files it should not touch, sends data to an outside server, edits the tests so they pass), and the authors marked the exact step where it happens. The other 108 stay on task. The paper also publishes a simple monitor recipe: send each step to a language model with the task and the agent's action, and ask in JSON, "is this off task?"
 
 I ran that recipe, with the paper's prompt unchanged, on five models through one API: GPT-4.1-mini (the paper's model), Gemini 3.5 Flash Lite, Claude Haiku 5.5, Claude Sonnet 5.5 and Claude Opus 5.5. Every step was judged on its own at temperature zero. I wrote down in advance what would count as a result, and every number below carries a 95% interval. The code, the logs and the pre-registration are public.
 
