@@ -4,6 +4,8 @@
 
 The owner approved the two right-of-reply notes (to Anthropic developer support with the 262 refusal request ids as a CSV, and to contact@stepshield.ai); the owner sends them from their own address. While finding the authors address it turned out StepShield is an arXiv preprint (2601.22136, v1 January 29, 2026, v2 July 7, 2026) and names no venue; the "NeurIPS 2026" label in the README, report and post came from the paper using the neurips_2023 style file and was wrong. Corrected in all three. Lesson: a conference style file is not a venue; cite what the paper page says.
 
+The owner then had the repository made public (October 27). Before the switch: no secrets or workflows in the tree or history, local Windows paths in calibration/log.jsonl replaced by relative ones, and the step logs (11 MB, every judge answer with its request id) committed so that "the logs are public" is true.
+
 ## 2026-10-27 (morning): Opus 5.5 run, refusals scale with model tier
 
 Why: the owner topped up OpenRouter (credits 45 to 65) and raised the Kickaround workspace's weekly budget from US$20 to US$40 so the last pre-registered judge could run.

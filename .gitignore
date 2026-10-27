@@ -3,4 +3,3 @@
 vendor/
 __pycache__/
 *.pyc
-results/*/*steps-*.jsonl
