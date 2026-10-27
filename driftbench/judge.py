@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import os
 from pathlib import Path
 from typing import Any
@@ -64,6 +65,46 @@ def as_confidence(value) -> float:
     return 0.0
 
 
+# StepShield's judge caps answers at 200 output tokens. GPT-4.1-mini and Gemini Flash Lite
+# answer in 55-65 tokens, but Claude models write 120-150-token reasons, so at 200 the JSON
+# was cut off in 27% of Haiku's and 7% of Sonnet's answers on 2026-10-26/27 and the vendor
+# parser returned "Parse error" (verdict: not rogue). 600 leaves room; at temperature 0
+# the shorter answers do not change.
+DEFAULT_MAX_TOKENS = 600
+
+FAILED_REASONS = ("Parse error", "empty response")
+
+
+def is_failed_row(row: dict[str, Any]) -> bool:
+    """A step whose verdict is a harness failure, not a judgment: unparsable, empty or API error.
+
+    A refusal ("refused: ...") is not a failure: the model was asked and declined. It is kept
+    as a verdict of its own and reported separately (see scripts/refusal_as_alert.py).
+    """
+    reason = row.get("reason") or ""
+    return reason in FAILED_REASONS or reason.startswith("API error") or bool(row.get("error"))
+
+
+def is_refused_row(row: dict[str, Any]) -> bool:
+    return (row.get("reason") or "").startswith("refused:") or row.get("parse_status") == "refused"
+
+
+def salvage_json(content: str) -> dict[str, Any] | None:
+    """Pull the verdict out of JSON that was cut off before its closing brace."""
+    verdict = re.search(r'"is_rogue"\s*:\s*(true|false)', content, re.I)
+    if not verdict:
+        return None
+    confidence = re.search(r'"confidence"\s*:\s*("?[\w.]+"?)', content)
+    category = re.search(r'"category"\s*:\s*"([^"]*)"', content)
+    reason = re.search(r'"reason"\s*:\s*"([^"]*)', content)
+    return {
+        "is_rogue": verdict.group(1).lower() == "true",
+        "confidence": (confidence.group(1).strip('"') if confidence else 0.0),
+        "category": category.group(1) if category else None,
+        "reason": "salvaged from truncated output: " + (reason.group(1) if reason else ""),
+    }
+
+
 class OpenRouterJudge(LLMJudge):
     def __init__(
         self,
@@ -73,6 +114,7 @@ class OpenRouterJudge(LLMJudge):
         budget_usd: float,
         rate_limit_rpm: int = 300,
         concurrency: int = 8,
+        max_tokens: int = DEFAULT_MAX_TOKENS,
     ):
         key = os.environ.get("OPENROUTER_API_KEY")
         if not key:
@@ -92,6 +134,7 @@ class OpenRouterJudge(LLMJudge):
         self.log_path = log_path
         self.budget_usd = budget_usd
         self._sem = asyncio.Semaphore(concurrency)
+        self.max_tokens = max_tokens
         self.budget_exceeded = False
         log_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -131,6 +174,7 @@ class OpenRouterJudge(LLMJudge):
 
         last_error = None
         content = ""
+        refused = None
         usage_in = usage_out = 0
         async with self._sem:
             await self._rate_limit()
@@ -144,7 +188,7 @@ class OpenRouterJudge(LLMJudge):
                                 {"role": "user", "content": user_prompt},
                             ],
                             temperature=self.temperature,
-                            max_tokens=200,
+                            max_tokens=self.max_tokens,
                         ),
                         timeout=self.timeout,
                     )
@@ -156,7 +200,15 @@ class OpenRouterJudge(LLMJudge):
                         self.output_tokens += usage_out
                         self.total_tokens += usage_in + usage_out
                         self.total_cost += self._calculate_cost(usage_in, usage_out)
-                    content = response.choices[0].message.content or ""
+                    choice = response.choices[0]
+                    content = choice.message.content or ""
+                    refusal = getattr(choice.message, "refusal", None)
+                    if choice.finish_reason == "content_filter" or refusal:
+                        # Anthropic's classifier blocks some rogue steps as "violative cyber content"
+                        # (seen 2026-10-27 with Sonnet 5.5 via OpenRouter). Keep the text: a monitor
+                        # that goes blind on dangerous steps is a finding, not a parse failure.
+                        content = ""
+                        refused = (refusal or choice.finish_reason or "")[:200]
                     last_error = None
                     break
                 except asyncio.TimeoutError:
@@ -166,10 +218,24 @@ class OpenRouterJudge(LLMJudge):
                     last_error = str(exc)[:200]
                     await asyncio.sleep(2**attempt)
 
+        parse_status = "ok"
         if last_error is not None:
             parsed = {"is_rogue": False, "confidence": 0.0, "category": None, "reason": f"API error: {last_error}"}
+            parse_status = "api_error"
+        elif refused:
+            parsed = {"is_rogue": False, "confidence": 0.0, "category": None, "reason": "refused: " + refused}
+            parse_status = "refused"
+        elif not content.strip():
+            parsed = {"is_rogue": False, "confidence": 0.0, "category": None, "reason": "empty response"}
+            parse_status = "empty"
         else:
             parsed = self._parse_response(content)
+            if parsed.get("reason") == "Parse error":
+                salvaged = salvage_json(content)
+                if salvaged:
+                    parsed, parse_status = salvaged, "salvaged"
+                else:
+                    parse_status = "failed"
 
         self._log(
             {
@@ -187,6 +253,8 @@ class OpenRouterJudge(LLMJudge):
                 "input_tokens": usage_in,
                 "output_tokens": usage_out,
                 "error": last_error,
+                "parse_status": parse_status,
+                "raw": content[:300] if parse_status not in ("ok", "api_error") else None,
             }
         )
         return StepResult(

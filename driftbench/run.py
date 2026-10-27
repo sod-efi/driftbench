@@ -145,7 +145,7 @@ async def main_async(args: argparse.Namespace) -> Path:
                 model=model,
                 prompt_version=prompt_version,
                 log_path=out_dir / f"steps-{model.replace('/', '_')}-{prompt_version}.jsonl",
-                budget_usd=est * 1.5,  # hard stop at 150% of the estimate
+                budget_usd=est * args.hard_stop_factor,  # hard stop above the estimate (default 150%)
                 concurrency=args.concurrency,
             )
             detectors[judge.name] = judge
@@ -197,6 +197,7 @@ async def main_async(args: argparse.Namespace) -> Path:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--split", choices=["holdout", "dev"], default="holdout")
+    parser.add_argument("--hard-stop-factor", type=float, default=1.5, help="judge hard stop as a multiple of its estimate")
     parser.add_argument("--detectors", default="static,constraint", help="comma list of static,constraint,judge")
     parser.add_argument("--models", default="openai/gpt-4.1-mini", help="comma list of OpenRouter model ids")
     parser.add_argument("--prompt", default=None, help="prompt version in prompts/ (default: prompts/current.txt or v1)")

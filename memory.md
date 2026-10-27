@@ -4,3 +4,4 @@
 - 2026-10-26: Every published number carries a 95% interval and there is no single-number ranking; vendors get a right of reply before publication.
 - 2026-10-26: Vendor code under vendor/ is never edited; the StepShield commit is recorded in every results.json.
 - 2026-10-26: Judge runs refuse to start above the stated budget and stop at 150% of their estimate; keys live only in .env or host variables.
+- 2026-10-27: A judge row is read only after its step log shows no failed parses (`parse_status`); the 200-token cap of the paper's recipe is replaced by 600 and recorded as a deviation. Refusals are a verdict of their own, scored both as no alert and as an alert, never dropped.

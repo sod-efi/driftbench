@@ -13,3 +13,11 @@
 **Budget.** Measured before the run: 3,056 judged steps and 1,174,797 input tokens for the held-out set with prompt v1. Hard stop per judge at 150% of its estimate.
 
 **Not claimed.** StepShield's trajectories are code agents and security-flavoured violations. Nothing here measures goal drift in customer-service or back-office agents, and nothing here tests a commercial drift product; the sales-gated vendors are invited to supply access for the full run.
+
+## Addendum, October 27, 2026 (written after the runs; nothing above was changed)
+
+**Deviation from the paper's recipe.** StepShield's judge caps answers at 200 output tokens. With Claude models that cap cut off the JSON on 836 of Haiku's and 216 of Sonnet's 3,056 answers, which the vendor parser scored as "not rogue". Those steps were re-asked with a 600-token cap, same prompt, same model, temperature 0 (each step is judged alone, so the other answers are unaffected). The headline rows use the repaired logs; the cap is a harness setting, not part of prompt v1. The first published Haiku row (0% false positives, 81.5% recall, October 26) is withdrawn.
+
+**Refusals.** Anthropic's content filter refused 84 Sonnet 5.5 requests ("violative cyber content"), 83 on rogue runs. The headline row scores a refusal as "not rogue" (what a monitor that reads only the JSON does). A second row scores a refusal as an alert. Both are reported; neither is hidden.
+
+**Scope of the usage loop's numbers.** Development-split numbers before October 27 carried the same truncation error and were rebuilt from the repaired logs.

@@ -1,0 +1,9 @@
+{
+ "time": "2026-10-27T02:38:09.888253+00:00",
+ "failed_before": 233,
+ "max_tokens": 600,
+ "rejudged": 233,
+ "failed_after": 0,
+ "cost_usd": 0.0849,
+ "now_rogue": 129
+}

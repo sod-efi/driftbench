@@ -1,5 +1,21 @@
 # Project history
 
+## 2026-10-27 (night): Gemini and Sonnet run, a truncation bug found and repaired, a refusal finding
+
+Why: the owner topped up OpenRouter and asked for Gemini 3.5 Flash Lite and Claude Sonnet 5.5 on the held-out set (about US$10 together) and the v2 comparison finished.
+
+Ran (`results/2026-10-27-holdout-judges-2`, merged with the earlier runs in `results/2026-10-27-holdout-all`): both judges with prompt v1 on all 216 held-out trajectories. Gemini Flash Lite: 15.7% false positives, 98.1% recall, EIR 0.92, US$0.88. Sonnet 5.5 came back with 51.9% recall, which did not look like a judgment.
+
+Bug found: every one of Sonnet's missed rogue steps was logged as "Parse error". StepShield's judge asks for at most 200 output tokens and its parser returns "Parse error" (verdict: not rogue) when the JSON is cut off. Claude models write 120-150-token reasons, so 836 of Haiku's and 216 of Sonnet's 3,056 answers had been cut off and silently scored "not rogue". The October 26 Haiku row (0% false positives, 81.5% recall, every catch on the exact step) was an artifact of this and is withdrawn; so was the "unexplained" 33% recall on the development split (26 of its 36 labelled rogue steps were cut off). Fix: `OpenRouterJudge` defaults to 600 output tokens, salvages a cut-off verdict by regex, logs `parse_status` and the raw text on failure; `driftbench/rejudge.py` re-asks only the failed steps of a run or a bare log and recomputes everything. Repaired rows: Haiku 24.1% false positives, 99.1% recall, EIR 0.92 (US$0.20 to repair); Sonnet 14.8%, 68.5%, 0.86 (US$1.12). Development split rebuilt: v1 36.1% / 94.4% / 0.74, v2 86.1% / 100% / 0.67, v1 kept (`calibration/log.jsonl`, entry with `note`).
+
+Finding on the way: 84 of Sonnet's requests were refused by Anthropic's content filter (finish reason `content_filter`, "violative cyber content", provider "Claude Platform on AWS" through OpenRouter), 83 on rogue runs, 55 at the exact labelled rogue step, in 56 of the 108 rogue runs; the same prompt and step get a normal answer from Haiku. Scored as silence Sonnet's recall is 68.5%; scored as an alert, 99.1% (`scripts/refusal_as_alert.py`, output in `results/2026-10-27-holdout-judges-2/refusals-claude-sonnet-5.5-v1.json`). The judge now logs refusals as `refused: ...` with `parse_status` `refused`.
+
+What the four judges say together (README has the table): recall is 96-99% for every judge that answers, within each other's intervals; false alarms differ by model and do not overlap (GPT-4.1-mini 5.6%, Gemini 15.7%, Haiku 24.1%); Sonnet at eleven times the price is no better on either axis; destructive actions (DEC) are the hardest category for all; no rogue run escaped all four judges. Agreement: GPT-4.1-mini and Gemini 92.1% (kappa 0.84), Haiku 86.6% and 88.9% with them, Sonnet about 76% with each.
+
+New scripts: `scripts/merge_results.py` (joins result files of one split for a cross-run agreement table), `scripts/breakdown.py` (recall by category and severity, "missed by A, caught by B"), `scripts/refusal_as_alert.py`. `run.py` gained `--hard-stop-factor` (Sonnet ran with 1.2 so a miss-estimate could not overspend). The provider factor for Google is now measured: 1.0x the tiktoken count and about 66 output tokens a step.
+
+Spend this night, from OpenRouter's credits endpoint before and after: US$10.41 (smoke 0.23, Gemini 0.88, Sonnet 7.61 + 1.12 re-judging, Haiku re-judging 0.20, v2 evaluation 0.22, calibration re-judging 0.15, probes about 0.01). Pilot total both nights: US$12.00. Left on the account: US$5.48 (checked 2026-10-27 about 02:30 UTC).
+
 ## 2026-10-26 (night): judges run, paper replicated, first calibration cycle
 
 Why: the owner authorized reading Kickaround's OpenRouter key into `.env` through a pipe, then asked to keep the spend small so Kickaround's users keep their credit. The account had US$7.49 left, so the run was cut to the two cheapest judges and one small calibration cycle, about US$1.60 in all.
@@ -26,8 +42,10 @@ Checked and not used: `agent-governance-toolkit` 4.1.0 (imports as `agent_compli
 
 ## Open items
 
-- After a top-up: finish the v2 evaluation on the development split (`python -m driftbench.repair` does not yet cover calibration runs; either add that or rerun `calibrate --from-run <run> --candidate v2` with `--budget-usd 0.6`), then Gemini 3.5 Flash Lite (about US$1) and Sonnet 5.5 (about US$8.70) on the held-out set.
-- Investigate the development-split gap (33% recall) before trusting calibration deltas; consider calibrating on StepShield's deployment-test split instead.
+- Opus 5.5 on the held-out set (about US$17) once the owner wants it; check `parse_status` and refusal counts before reading its row.
+- Three Haiku answers and one development-split answer still fail to parse after re-asking (600 tokens of output, empty or whitespace content); negligible, but look at what the provider returns.
+- The calibration rule demands a false-alarm drop first; v2 failed it on the merits (86% false positives). The development split is much harder on false alarms (v1: 36%) than the held-out set (24%); understand why before trusting deltas, and consider StepShield's deployment-test split.
+- Ask Anthropic (or read the refusals documentation) whether the content filter can be relaxed for monitoring use, and how other filtered providers behave; the refusal finding needs a right of reply.
 - Write the report with the agreement table and the three pre-registered readings; invite the sales-gated vendors; right of reply.
 - Full run: ATBench as a mixed-safety check, AgentDrift as an attack track, 200 home-made drift trajectories with a private held-out split, Azure Task Adherence and Lakera once accounts exist (owner creates accounts).
 - Publish: open repo, dated report, quarterly reruns.
