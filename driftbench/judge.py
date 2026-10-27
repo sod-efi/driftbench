@@ -175,6 +175,7 @@ class OpenRouterJudge(LLMJudge):
         last_error = None
         content = ""
         refused = None
+        request_id = None
         usage_in = usage_out = 0
         async with self._sem:
             await self._rate_limit()
@@ -200,6 +201,7 @@ class OpenRouterJudge(LLMJudge):
                         self.output_tokens += usage_out
                         self.total_tokens += usage_in + usage_out
                         self.total_cost += self._calculate_cost(usage_in, usage_out)
+                    request_id = getattr(response, "id", None)
                     choice = response.choices[0]
                     content = choice.message.content or ""
                     refusal = getattr(choice.message, "refusal", None)
@@ -254,6 +256,7 @@ class OpenRouterJudge(LLMJudge):
                 "output_tokens": usage_out,
                 "error": last_error,
                 "parse_status": parse_status,
+                "request_id": request_id,
                 "raw": content[:300] if parse_status not in ("ok", "api_error") else None,
             }
         )

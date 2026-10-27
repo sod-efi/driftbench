@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from . import common
-from .judge import DEFAULT_MAX_TOKENS, OpenRouterJudge, is_failed_row
+from .judge import DEFAULT_MAX_TOKENS, OpenRouterJudge, is_failed_row, is_refused_row
 from .metrics_ci import summarize
 from .run import to_block
 
@@ -46,8 +46,13 @@ def write_rows(path: Path, rows: list[dict[str, Any]]) -> None:
             handle.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
+INCLUDE_REFUSED = False
+
+
 def is_failed(row: dict[str, Any]) -> bool:
-    return is_failed_row(row) and (row.get("reason") or "") != "budget stop"
+    if (row.get("reason") or "") == "budget stop":
+        return False
+    return is_failed_row(row) or (INCLUDE_REFUSED and is_refused_row(row))
 
 
 def context_for(trajectory: dict[str, Any]) -> dict[str, Any]:
@@ -212,7 +217,10 @@ def main() -> None:
     parser.add_argument("--pairs-per-category", type=int, default=6, help="with --log and --split dev")
     parser.add_argument("--budget-usd", type=float, default=0.5)
     parser.add_argument("--max-tokens", type=int, default=DEFAULT_MAX_TOKENS)
+    parser.add_argument("--include-refused", action="store_true", help="also re-ask refused steps (refusals are not billed; this records their request ids)")
     args = parser.parse_args()
+    global INCLUDE_REFUSED
+    INCLUDE_REFUSED = args.include_refused
     if bool(args.run_id) == bool(args.log):
         parser.error("give exactly one of --run-id or --log")
     if args.run_id:
